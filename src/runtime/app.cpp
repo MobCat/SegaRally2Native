@@ -285,6 +285,10 @@ int main(int argc, char** argv) {
     CreateDirectoryA("save", nullptr);
     CreateDirectoryA("out", nullptr);   // dumps, screenshots, out/missing.txt
     g_eeprom.load("save/eeprom.bin", false);
+    // Testing aid: SR2_STATS_TEST=1, records and achievements counted in scripted
+    // runs too (--auto, --headless, SR2_POKE...); give them a save folder of their own
+    static const bool stats_test = getenv("SR2_STATS_TEST") != nullptr;
+    if (stats_test && g_opt.replay.empty()) stats_init();
 
     // The game code uses the original CPU's stack as memory and nests
     // many calls: run it on a thread with 512 MB of native stack.
@@ -338,7 +342,7 @@ int main(int argc, char** argv) {
         printf("Snapshot %s (frame %llu)\n", g_opt.replay.c_str(), (unsigned long long)g_video_frame);
     } else {
         // Records and achievements: real games only, never the scripted or cheated test runs
-        if (g_opt.menu && g_auto.events.empty()) stats_init();
+        if (g_opt.menu && g_auto.events.empty() && !stats_test) stats_init();
         g_audio.start();
         g_hold = g_opt.menu;   // the main menu comes first
         g_skip_attract = g_opt.menu && g_auto.events.empty();   // the menu instead of the attract (runtime.cpp)

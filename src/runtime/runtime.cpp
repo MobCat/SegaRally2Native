@@ -58,7 +58,6 @@ std::vector<uint32_t> g_diff_mmio;   // (address, size, value) triples
 void diff_run(Ctx& c, uint32_t fn);
 
 void rt_trace(Ctx& c, uint32_t fn) {
-    stats_enter(c, fn);
     if (fn == g_diff_fn && !g_diff_active) {
         diff_run(c, fn);
         return;
@@ -988,6 +987,7 @@ ULONGLONG g_boot_ms = GetTickCount64();
 // Exit from the game thread itself: nothing else pushes audio, so it is
 // stopped here before the process goes away
 [[noreturn]] void exit_from_game_thread(int code) {
+    stats_save();   // runs that end here (--frames, --headless) keep what they counted
     fflush(stdout);
     g_audio.stop();
     ExitProcess(code);
@@ -1283,8 +1283,9 @@ void rt_event(Ctx& c) {
                     }
                 }
             }
-            {   // SR2_POKE=ADDR=VALUE[@FROM],...: a RAM word written every frame (from that frame on; finding the game's state)
-                struct Poke { uint32_t addr, value; uint64_t from; };
+            {   // SR2_POKE=ADDR=VALUE[@FROM[-TO]],...: a RAM word written every frame (from that frame on, or
+                // up to TO; finding the game's state, testing the achievements)
+                struct Poke { uint32_t addr, value; uint64_t from, to; };
                 static std::vector<Poke> pokes = [] {
                     std::vector<Poke> v;
                     const char* e = getenv("SR2_POKE");
@@ -1293,19 +1294,23 @@ void rt_event(Ctx& c) {
                         int n = 0;
                         if (sscanf(e, "%x=%u%n", &a, &val, &n) < 2) break;
                         e += n;
-                        uint64_t from = 0;
+                        uint64_t from = 0, to = ~0ull;
                         if (*e == '@') {
                             char* end = nullptr;
                             from = strtoull(e + 1, &end, 10);
                             e = end;
+                            if (*e == '-') {
+                                to = strtoull(e + 1, &end, 10);
+                                e = end;
+                            }
                         }
-                        v.push_back({a, val, from});
+                        v.push_back({a, val, from, to});
                         if (*e == ',') e++;
                     }
                     return v;
                 }();
                 for (const Poke& p : pokes)
-                    if (g_frame >= p.from) wr32(p.addr, p.value);
+                    if (g_frame >= p.from && g_frame <= p.to) wr32(p.addr, p.value);
             }
             {   // SR2_RAM_DUMPS=F1,F2,...: the RAM to out/ram_F.bin on those frames (finding the game's state)
                 static std::vector<uint64_t> dumps = [] {

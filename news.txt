@@ -12,3 +12,8 @@
 #   - text         a line of the entry (lines starting "- " get a bullet)
 #   # ...          a comment, never shown
 # Newest entry at the top. Keep each one short: about ten lines fit.
+
+[1] 11 November 2026
+- 14 achievements, from your first finish to champion of the championship.
+- RECORDS is back in the main menu, with ACHIEVEMENTS and STATS tabs: races, championships, best laps and times on each course.
+- MORE RECOMPS now lists Star Wars Trilogy too.
