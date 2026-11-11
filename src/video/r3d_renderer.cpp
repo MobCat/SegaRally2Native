@@ -1105,7 +1105,11 @@ void R3DRenderer::update_atmosphere(const ScreenLayout& lay, uint32_t target_w, 
             // the sun's shadows were faint, more so with the light the global
             // illumination puts back into them. SR2_SHADOW_DEPTH: debugging aid)
             static const float depth = getenv("SR2_SHADOW_DEPTH") ? float(atof(getenv("SR2_SHADOW_DEPTH"))) : 1.0f;
-            u.shadow[0] = std::min(shadow_strength_, 1.0f) * depth;
+            // Without the global illumination nothing puts light back into the
+            // shadows, and a full cut left them black (the car's on a sunny road
+            // most of all): then they take SR2_SHADOW_NO_GI of it (0.6)
+            static const float no_gi = getenv("SR2_SHADOW_NO_GI") ? float(atof(getenv("SR2_SHADOW_NO_GI"))) : 0.6f;
+            u.shadow[0] = std::min(shadow_strength_, 1.0f) * depth * (rt_gi_ ? 1.0f : no_gi);
             u.shadow[1] = 1.0f / float(SHADOW_SIZE);
             u.shadow[2] = 2.5f * texel;   // normal offset
             u.shadow[3] = 1.5f * texel / zr;   // depth bias
