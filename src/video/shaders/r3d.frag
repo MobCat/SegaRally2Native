@@ -679,8 +679,11 @@ void main() {
         c.a = 1.0;
     }
     // Soft particles: smoke, fire and other translucent surfaces of the world
-    // fade out where they meet what stands behind them, instead of a hard line
-    if (vp.quality.x < 0.0 && atm.soft.x > 0.0 && (flags & WORLD) != 0u) {
+    // fade out where they meet what stands behind them, instead of a hard line.
+    // Textured ones only: the game's untextured black patch under each car (its
+    // shadow) lies 3 cm over the road once the car is set down on it
+    // (settle_player_car), and faded over 2 m it was gone
+    if (vp.quality.x < 0.0 && atm.soft.x > 0.0 && (flags & (WORLD | TEXTURED)) == (WORLD | TEXTURED)) {
         float d = texelFetch(scene_depth, ivec2(gl_FragCoord.xy), 0).r;
         if (d > 0.0) c.a *= clamp((view_pos.z + 1e-3 / d) / atm.soft.y, 0.0, 1.0);
     }

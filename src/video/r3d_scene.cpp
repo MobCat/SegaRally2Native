@@ -132,11 +132,10 @@ void R3DSceneBuilder::build(const R3DFrameState& state, R3DScene& out) {
     // The game's shadows under the cars: black, self-lit, see-through
     // untextured polygons in the world (several shapes laid over each other,
     // which stacked into steps of darker grey); hidden when the cars cast
-    // traced shadows (set_hide_blob_shadows). Not all the way: the traced sun
-    // shadow falls away from the car with the sun high or behind it, and is
-    // faint, so the car seemed to float. A lighter blob stays as its contact
-    // shadow (SR2_BLOB_SHADOW=F: F of its opacity, 0 hides it as before)
-    static const float blob_keep = getenv("SR2_BLOB_SHADOW") ? float(atof(getenv("SR2_BLOB_SHADOW"))) : 0.5f;
+    // sun shadows of their own, traced or in the shadow map
+    // (set_hide_blob_shadows); with the shadows off they are the cars' only
+    // shadow (SR2_BLOB_SHADOW=F keeps F of their opacity, to compare)
+    static const float blob_keep = getenv("SR2_BLOB_SHADOW") ? float(atof(getenv("SR2_BLOB_SHADOW"))) : 0.0f;
     if (hide_blob_shadows_ && blob_keep < 1.0f)
         for (R3DVertex& x : out.vertices)
             if ((x.flags & (R3D_WORLD | R3D_LUMINOUS | R3D_TEXTURED)) == (R3D_WORLD | R3D_LUMINOUS) &&

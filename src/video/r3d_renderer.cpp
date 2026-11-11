@@ -1312,8 +1312,14 @@ void R3DRenderer::record_shadows(const Frame& f) {
         vkCmdSetViewport(cmd, 0, 1, &sv);
         VkRect2D ss{{0, 0}, {SHADOW_SIZE, SHADOW_SIZE}};
         vkCmdSetScissor(cmd, 0, 1, &ss);
+        // The world, and the cars drawn in viewports of their own (CAR: the
+        // player's, the rivals near it), which share the world's camera; without
+        // them only the game's dark patch under each car showed its shadow
+        static const bool no_cars = getenv("SR2_CAR_SHADOWMAP") && atoi(getenv("SR2_CAR_SHADOWMAP")) == 0;
         for (const R3DViewport& v : scene_->viewports) {
-            if (!v.world || !v.opaque_count) continue;
+            if (!v.opaque_count || size_t(v.opaque_first) >= scene_->vertices.size()) continue;
+            bool car = !v.world && !no_cars && (scene_->vertices[v.opaque_first].flags & R3D_CAR);
+            if (!v.world && !car) continue;
             ViewportPush pc{};
             memcpy(pc.proj, shadow_matrix_, 64);
             pc.params[3] = before;
