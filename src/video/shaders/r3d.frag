@@ -66,16 +66,27 @@ float sun_shadow(vec3 n) {
     vec4 lc = atm.shadow_matrix * vec4(pos, 1.0);
     vec2 uv = lc.xy * 0.5 + 0.5;
     if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))) || lc.z <= 0.0) return 1.0;
-    // 4x4 texels around the point, compared one by one (soft edges)
-    float lit = 0.0;
-    vec2 t = vec2(atm.shadow.y);
+    // 4x4 texels around the point, compared one by one and weighted by where
+    // the point falls between them: a 3x3 box over bilinear comparisons (a
+    // tent), so the edge slides smoothly from texel to texel. (An even 4x4
+    // average was constant within each texel: the edges came out as stairs
+    // the size of a texel, in bands of grey, without ray tracing.)
+    vec2 size = vec2(1.0 / atm.shadow.y);
+    vec2 st = uv * size - 0.5;
+    vec2 b = floor(st), f = st - b;
+    float wx[4] = float[4](1.0 - f.x, 1.0, 1.0, f.x);   // texels b-1 .. b+2
+    float wy[4] = float[4](1.0 - f.y, 1.0, 1.0, f.y);
+    float shade = 0.0;
     for (int y = 0; y < 2; y++)
         for (int x = 0; x < 2; x++) {
-            vec4 d = textureGather(shadow_map, uv + (vec2(x, y) - 0.5) * 2.0 * t, 0);
+            // The 2x2 texels from (b-1, b-1) + 2 * (x, y): gathered at their shared corner
+            vec4 d = textureGather(shadow_map, (b + 2.0 * vec2(x, y)) / size, 0);
             vec4 hit = vec4(greaterThan(d, vec4(lc.z + atm.shadow.w)));
-            lit += dot(hit, vec4(1.0));
+            // textureGather's order: x (0,1), y (1,1), z (1,0), w (0,0)
+            shade += hit.w * wx[2 * x] * wy[2 * y] + hit.z * wx[2 * x + 1] * wy[2 * y] +
+                     hit.x * wx[2 * x] * wy[2 * y + 1] + hit.y * wx[2 * x + 1] * wy[2 * y + 1];
         }
-    lit = 1.0 - lit / 16.0;
+    float lit = 1.0 - shade / 9.0;
     // Fades out towards the edge of the shadow map
     vec2 edge = min(uv, 1.0 - uv);
     float fade = smoothstep(0.0, 0.08, min(edge.x, edge.y));
@@ -467,9 +478,13 @@ void main() {
 
     vec4 c = t * col;
     if (c.a < 1.0 / 32.0) discard;
-    // Depth of the nearest see-through surface (spec 7.2); effects stay out of it
+    // Depth of the nearest see-through surface (spec 7.2); effects stay out of
+    // it. Not the game's black patch under each car (its shadow: untextured,
+    // self-lit): it is made of several shapes laid over each other, which
+    // blended one over another came out nearly black; only the nearest shows
     if (vp.quality.x <= -1000.0) {
-        if ((flags & (TEX_ALPHA | ALPHA_TEST | LUMINOUS)) != 0u) discard;
+        bool blob = (flags & (WORLD | LUMINOUS | TEXTURED)) == (WORLD | LUMINOUS) && max(col.r, max(col.g, col.b)) == 0.0;
+        if ((flags & (TEX_ALPHA | ALPHA_TEST | LUMINOUS)) != 0u && !blob) discard;
         return;
     }
     // Texture alpha (spec 7.2): solid texels belong to the opaque pass, the
@@ -668,8 +683,11 @@ void main() {
         c.a = 1.0;
     }
     // Soft particles: smoke, fire and other translucent surfaces of the world
-    // fade out where they meet what stands behind them, instead of a hard line
-    if (vp.quality.x < 0.0 && atm.soft.x > 0.0 && (flags & WORLD) != 0u) {
+    // fade out where they meet what stands behind them, instead of a hard line.
+    // Textured ones only: the game's untextured black patch under each car (its
+    // shadow) lies 3 cm over the road once the car is set down on it
+    // (settle_player_car), and faded over 2 m it was gone
+    if (vp.quality.x < 0.0 && atm.soft.x > 0.0 && (flags & (WORLD | TEXTURED)) == (WORLD | TEXTURED)) {
         float d = texelFetch(scene_depth, ivec2(gl_FragCoord.xy), 0).r;
         if (d > 0.0) c.a *= clamp((view_pos.z + 1e-3 / d) / atm.soft.y, 0.0, 1.0);
     }

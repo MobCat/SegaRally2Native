@@ -446,6 +446,14 @@ VkPipeline R3DRenderer::make_pipeline(const PipelineDesc& d) {
     ds.depthTestEnable = d.depth;
     ds.depthWriteEnable = d.depth_write;
     ds.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;   // reverse Z
+    if (d.once) {
+        ds.depthWriteEnable = VK_TRUE;
+        ds.depthCompareOp = VK_COMPARE_OP_GREATER;
+    }
+    if (d.bias != 0) {
+        rs.depthBiasEnable = VK_TRUE;
+        rs.depthBiasConstantFactor = d.bias;
+    }
     VkPipelineColorBlendAttachmentState cbas[3]{};
     VkPipelineColorBlendAttachmentState& cba = cbas[0];
     cba.colorWriteMask = 0xF;
@@ -548,6 +556,18 @@ bool R3DRenderer::create_pipelines() {
     PipelineDesc trans_depth = world;
     trans_depth.depth_only = true;
     trans_depth_ = make_pipeline(trans_depth);
+    // The game's dark patch under each car (its shadow), made of several
+    // shapes laid over each other: blended over one another they came out
+    // nearly black. It is blended once at each pixel instead: its nearest depth
+    // goes first a hair farther (blob_depth_; 1 unit, the least that also
+    // leaves no seam where two of its shapes cross), then the first of it to
+    // pass, nearer than that, takes the pixel (blob_)
+    PipelineDesc blob = translucent;
+    blob.once = true;
+    blob_ = make_pipeline(blob);
+    PipelineDesc blob_depth = trans_depth;
+    blob_depth.bias = -1.0f;
+    blob_depth_ = make_pipeline(blob_depth);
     shadow_ = make_pipeline({.vs = r3d_vs, .fs = r3d_fs, .layout = r3d_layout_, .color = VK_FORMAT_UNDEFINED,
                              .depth = true, .depth_write = true, .vertex_input = true});
     // Full-screen passes: a triangle over the target, no vertex input
@@ -571,7 +591,7 @@ bool R3DRenderer::create_pipelines() {
     ao_apply_glow_ = make_pipeline({.vs = c_vs, .fs = aoa_fs, .layout = ao_layout_, .color = VK_FORMAT_R8G8B8A8_UNORM,
                                     .samples = samples_, .multiply = true});
     for (auto m : {r3d_vs, r3d_fs, c_vs, c_fs, b_fs, ao_fs, aoa_fs}) vkDestroyShaderModule(dev_, m, nullptr);
-    return opaque_ && translucent_ && trans_depth_ && shadow_ && compose_measure_ && compose_ && bloom_ && ao_pass_ && ao_apply_ && ao_apply_glow_;
+    return opaque_ && translucent_ && blob_ && blob_depth_ && trans_depth_ && shadow_ && compose_measure_ && compose_ && bloom_ && ao_pass_ && ao_apply_ && ao_apply_glow_;
 }
 
 // w, h: the 3D image as drawn; up_w, up_h: as DLSS hands it on (the same but with DLSS upscaling)
@@ -1312,8 +1332,15 @@ void R3DRenderer::record_shadows(const Frame& f) {
         vkCmdSetViewport(cmd, 0, 1, &sv);
         VkRect2D ss{{0, 0}, {SHADOW_SIZE, SHADOW_SIZE}};
         vkCmdSetScissor(cmd, 0, 1, &ss);
+        // The world. The cars drawn in viewports of their own (CAR: the player's,
+        // the rivals near it) do not cast here: without ray tracing their shadow
+        // is the game's own dark patch under each car, as in the arcade
+        // (SR2_CAR_SHADOWMAP=1 casts them as well, to compare)
+        static const bool cars = getenv("SR2_CAR_SHADOWMAP") && atoi(getenv("SR2_CAR_SHADOWMAP")) == 1;
         for (const R3DViewport& v : scene_->viewports) {
-            if (!v.world || !v.opaque_count) continue;
+            if (!v.opaque_count || size_t(v.opaque_first) >= scene_->vertices.size()) continue;
+            bool car = !v.world && cars && (scene_->vertices[v.opaque_first].flags & R3D_CAR);
+            if (!v.world && !car) continue;
             ViewportPush pc{};
             memcpy(pc.proj, shadow_matrix_, 64);
             pc.params[3] = before;
@@ -1511,18 +1538,48 @@ void R3DRenderer::record_world(const Frame& f) {
                     // nearest one shows at each pixel, as on the Real3D (spec 7.2),
                     // so their depth goes first. Fire, smoke and other texture-alpha
                     // or luminous effects keep blending in list order.
+                    // The world's see-through surfaces go in runs: the game's
+                    // dark patch under each car (its shadow) with pipelines of
+                    // its own (blob_depth_, blob_: blended once at each pixel)
+                    const std::vector<R3DVertex>& vs = scene_->vertices;
+                    auto is_blob = [&](uint32_t i) {
+                        const R3DVertex& x = vs[i];
+                        return (x.flags & (R3D_WORLD | R3D_LUMINOUS | R3D_TEXTURED)) == (R3D_WORLD | R3D_LUMINOUS) &&
+                               (x.color & 0x00FFFFFFu) == 0 && (x.color >> 24) < 255;
+                    };
+                    auto draw_runs = [&](VkPipeline other, VkPipeline blob) {
+                        if (!v.world) {
+                            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, other);
+                            vkCmdDraw(cmd, count, 1, v.trans_first, 0);
+                            return;
+                        }
+                        uint32_t end = std::min<uint32_t>(v.trans_first + count, uint32_t(vs.size()));
+                        for (uint32_t a = v.trans_first; a < end;) {
+                            bool here = is_blob(a);
+                            uint32_t b = a + 3;
+                            while (b < end && is_blob(b) == here) b += 3;
+                            b = std::min(b, end);
+                            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, here ? blob : other);
+                            vkCmdDraw(cmd, b - a, 1, a, 0);
+                            a = b;
+                        }
+                    };
                     if (pass == 1) {
                         ViewportPush pd = pc;
                         pd.quality[0] = -1000.0f;
-                        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, trans_depth_);
                         vkCmdPushConstants(cmd, r3d_layout_, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                                            0, sizeof(pd), &pd);
-                        vkCmdDraw(cmd, count, 1, v.trans_first, 0);
+                        draw_runs(trans_depth_, blob_depth_);
                         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, translucent_);
                     }
                     vkCmdPushConstants(cmd, r3d_layout_, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                                        sizeof(pc), &pc);
-                    vkCmdDraw(cmd, count, 1, pass == 0 ? v.opaque_first : v.trans_first, 0);
+                    if (pass == 0) {
+                        vkCmdDraw(cmd, count, 1, v.opaque_first, 0);
+                        continue;
+                    }
+                    draw_runs(translucent_, blob_);
+                    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, translucent_);
                 }
             }
             i = j;
@@ -2036,7 +2093,7 @@ void R3DRenderer::gpu_time_mark(VkCommandBuffer cmd, uint32_t index) {
 void R3DRenderer::shutdown() {
     if (!dev_) return;
     vkDeviceWaitIdle(dev_);
-    for (auto p : {opaque_, translucent_, trans_depth_, shadow_, compose_measure_, compose_, bloom_, compose_glow_, ao_pass_, ao_apply_, ao_apply_glow_})
+    for (auto p : {opaque_, translucent_, blob_, blob_depth_, trans_depth_, shadow_, compose_measure_, compose_, bloom_, compose_glow_, ao_pass_, ao_apply_, ao_apply_glow_})
         if (p) vkDestroyPipeline(dev_, p, nullptr);
     dlaa_.shutdown();
     rt_.shutdown();
