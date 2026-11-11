@@ -16,9 +16,6 @@
   <img src="docs/img/village.jpg" alt="Through a mountain village in true widescreen, with ray-traced sun shadows" width="100%">
 </p>
 
-> **Work in progress.** The game plays from start to finish, but the port is still being
-> made: see [the roadmap](docs/ROADMAP.md).
-
 ## What you get
 
 - **True widescreen**, not stretched, with the HUD at the corners.

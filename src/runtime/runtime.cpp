@@ -948,7 +948,7 @@ void rt_sc(Ctx& c, uint32_t addr) {
 namespace {
 
 // (Widescreen culling: the game culls to its own 4:3 view. Its viewport
-// records are not known yet (docs/ROADMAP.md): g_wide_applied stays 1)
+// records are not known yet: g_wide_applied stays 1)
 
 void video_snapshot() {
     std::lock_guard<std::mutex> lock(g_video_mutex);
