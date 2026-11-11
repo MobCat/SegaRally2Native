@@ -28,6 +28,7 @@ constexpr uint32_t WHITE_TOP = 0xFFFFFF, WHITE_BOTTOM = 0xD8E6F6;   // the selec
 
 constexpr const wchar_t* COFFEE_URL = L"https://buymeacoffee.com/snicolast8u";
 constexpr const wchar_t* COFFEE_LABEL = L"BUY ME A COFFEE";   // an entry of MORE RECOMPS
+constexpr uint32_t COFFEE_INK = 0x0D0C22;   // their dark blue-black
 constexpr const wchar_t* COFFEE_HINT = L"Support the port: opens buymeacoffee.com in your browser";
 
 // UPDATE AVAILABLE: news.txt on the public repository's main branch (news.h)
@@ -745,7 +746,7 @@ bool Frontend::key(int vk) {
         case 'E': case VK_NEXT: set_tab(tab_ + 1); return true;
         case VK_TAB: set_tab(tab_ + ((GetKeyState(VK_SHIFT) & 0x8000) ? -1 : 1)); return true;
         }
-    if (screen_ == Screen::More && vk == 'G') {   // its page, also when it is installed
+    if (screen_ == Screen::More && vk == 'G' && selected_ < RECOMP_COUNT) {   // its page, also when it is installed
         open_recomp_page(more_game_);
         return true;
     }
@@ -1748,7 +1749,27 @@ void Frontend::draw_side_menu(const std::vector<Item>& list) {
                          : debug_row ? Style{0xFF8A7A, 0xD8402E, EDGE, U(2), 0.95f, U(3)}
                                      : Style{PALE_TOP, PALE_BOTTOM, EDGE, U(2), 0.95f, U(3)};
         int ty = y + spacing / 2 - item_px * 55 / 100;
-        int tw = text(TITLE, item_px, it.label, tx, ty, 2, st);
+        int tw = 0;
+        if (it.id == COFFEE) {   // the donation link: Buy Me a Coffee's yellow button and its cup, at the right
+            int ch = std::min(U(56), spacing - U(14)), cup = ch / 2;
+            int x1 = tx, x0 = x1 - (U(24) + cup + U(12) + measure(ITEM, U(21), COFFEE_LABEL) + U(28));
+            int cy0 = y + (spacing - ch) / 2;
+            if (sel)   // chosen: a ring round it, and brighter
+                pill(x0 - U(5), cy0 - U(5), x1 + U(5), cy0 + ch + U(5), SABER, 1);
+            pill(x0, cy0, x1, cy0 + ch, sel ? 0xFFE94D : 0xFFDD00, sel ? 1.0f : 0.9f);
+            // A takeaway cup: the lid, the body narrowing to the bottom, a yellow sleeve round its middle
+            int cx = x0 + U(24) + cup / 2, cy = cy0 + (ch - cup) / 2;
+            pill(cx - cup / 2, cy, cx + cup / 2, cy + cup * 22 / 100, COFFEE_INK, 1);
+            for (int yy = cy + cup * 26 / 100; yy < cy + cup; yy++) {
+                int half = cup * 42 / 100 - (yy - cy) * 12 / 100, edge = std::max(1, U(2));
+                fill(cx - half, yy, cx + half, yy + 1, COFFEE_INK, 1);
+                if (yy >= cy + cup * 48 / 100 && yy < cy + cup * 72 / 100)
+                    fill(cx - half + edge, yy, cx + half - edge, yy + 1, 0xFFDD00, 1);
+            }
+            text(ITEM, U(21), COFFEE_LABEL, x0 + U(24) + cup + U(12), cy0 + ch / 2 - U(13), 0, {COFFEE_INK, COFFEE_INK});
+        } else {
+            tw = text(TITLE, item_px, it.label, tx, ty, 2, st);
+        }
         if (!it.value.empty() && screen_ == Screen::Debug) {   // DEBUG's choices: between arrows, left of the name
             int vx = tx - tw - U(40), vy = y + spacing / 2;
             triangle(vx, vy, U(18), +1, sel ? 0xFFE08A : 0xB0B8C8, 0.9f);
