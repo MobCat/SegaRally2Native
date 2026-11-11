@@ -412,8 +412,8 @@ std::vector<Frontend::Item> Frontend::items() const {
         L"Two ears: gentle crossfeed, and the rear sound placed behind you"};
     switch (screen_) {
     case Screen::Main: {
-        // RECORDS comes back with Sega Rally 2's own achievements and statistics
         std::vector<Item> list = {{PLAY, L"PLAY", L"", L"The original arcade game"},
+                                  {RECORDS, L"RECORDS", L"", L"Achievements and statistics"},
                                   {OPTIONS, L"OPTIONS", L"", L"Display, sound and controls"},
                                   {MORE_GAMES, L"MORE RECOMPS", L"", L"Other arcade games recompiled for PC by snicolast"},
                                   {QUIT, L"QUIT", L"", L"Close the game"}};
@@ -1125,24 +1125,23 @@ std::wstring grouped(int64_t v) {   // 12,345
     return v < 0 ? L"-" + r : r;
 }
 
-std::wstring clock_time(int64_t frames) {   // 2:31.4
-    double s = double(frames) / 57.524;
+std::wstring race_time(int64_t ticks) {   // 1'02"34, as the game shows its times (1/6000 s)
+    if (ticks <= 0) return L"-";
+    int64_t cs = ticks / 60;
     wchar_t b[32];
-    swprintf(b, 32, L"%d:%04.1f", int(s / 60), s - 60 * int(s / 60));
+    swprintf(b, 32, L"%lld'%02lld\"%02lld", (long long)(cs / 6000), (long long)(cs / 100 % 60), (long long)(cs % 100));
     return b;
+}
+
+std::wstring ordinal(int n) {   // 1st, 2nd, 3rd, 4th ... 11th, 12th, 13th
+    const wchar_t* th = n % 100 / 10 == 1 ? L"th" : n % 10 == 1 ? L"st" : n % 10 == 2 ? L"nd" : n % 10 == 3 ? L"rd" : L"th";
+    return std::to_wstring(n) + th;
 }
 
 std::wstring hours(int64_t frames) {   // 3 H 05 MIN
     int64_t m = int64_t(double(frames) / 57.524 / 60);
     wchar_t b[32];
     swprintf(b, 32, L"%lld H %02lld MIN", (long long)(m / 60), (long long)(m % 60));
-    return b;
-}
-
-std::wstring percent(int64_t part, int64_t whole) {
-    if (whole <= 0) return L"-";
-    wchar_t b[16];
-    swprintf(b, 16, L"%.1f%%", 100.0 * double(part) / double(whole));
     return b;
 }
 
@@ -1184,18 +1183,22 @@ std::vector<Frontend::RecordRow> Frontend::record_rows() const {
     };
     row(L"GAMES PLAYED", grouped(s.games));
     row(L"TIME PLAYED", hours(s.play_frames));
-    row(L"BEST SCORE", s.best_score ? grouped(s.best_score) : L"-", L"In one game");
-    row(L"ENEMIES DESTROYED", grouped(s.kills), percent(s.kills, s.appeared) + L" of the " + grouped(s.appeared) +
-                                                  L" that appeared");
-    row(L"PHASES CLEARED", grouped(s.phases_cleared),
-        grouped(s.perfect_phases) + L" with every enemy destroyed,  " + grouped(s.untouched_phases) +
-            L" without losing any shield");
-    for (int i = 0; i < STAT_STAGES; i++) {
-        const Stats::Stage& st = s.stage[i];
-        std::wstring detail = st.clears ? grouped(st.clears) + L" clears,  best phase " +
-                                              percent(st.best_destroyed, 1000) + L" of the enemies destroyed"
-                                        : L"Not cleared yet";
-        row(STAT_STAGE_NAMES[i], st.best_frames ? clock_time(st.best_frames) : L"-", detail);
+    row(L"RACES FINISHED", grouped(s.races_finished), L"Of " + grouped(s.races_started) + L" started");
+    row(L"STAGES CLEARED", grouped(s.stages_cleared), L"In the championship");
+    row(L"CHAMPIONSHIPS", grouped(s.championships),
+        s.championships ? L"Best position " + ordinal(s.best_champ_position) + L",  best total time " +
+                              race_time(s.best_champ_time)
+                        : L"Not finished yet");
+    for (int i = 0; i < STAT_COURSES; i++) {   // the best lap of either mode on the right
+        const Stats::Course& c = s.course[i];
+        int64_t lap = c.best_lap[0] && (!c.best_lap[1] || c.best_lap[0] < c.best_lap[1]) ? c.best_lap[0] : c.best_lap[1];
+        std::wstring detail;
+        for (int m = 0; m < 2; m++)   // the best race time of each mode (the laps of each are in save/stats.ini)
+            if (c.best_time[m])
+                detail += std::wstring(detail.empty() ? L"Best time: " : L",  ") + (m ? L"practice " : L"championship ") +
+                          race_time(c.best_time[m]);
+        if (detail.empty()) detail = L"Not finished yet";
+        row(std::wstring(STAT_COURSE_NAMES[i]) + L"  BEST LAP", race_time(lap), detail);
     }
     return rows;
 }
@@ -1725,11 +1728,10 @@ void Frontend::draw_side_menu(const std::vector<Item>& list) {
     if (screen_ == Screen::Main) {   // the donation link and how far the player has got, at the top left
         int got = 0;
         for (int64_t t : records.unlocked) got += t != 0;
-        int best = records.stats.best_score;
-        // ACHIEVEMENTS comes back with Sega Rally 2's own (it counted Star Wars Trilogy's)
-        std::vector<std::pair<std::wstring, std::wstring>> chips;
-        (void)got;
-        if (best > 0) chips.push_back({L"BEST SCORE", grouped(best)});
+        int best = records.stats.best_champ_position;
+        std::vector<std::pair<std::wstring, std::wstring>> chips = {
+            {L"ACHIEVEMENTS", std::to_wstring(got) + L"/" + std::to_wstring(achievement_table().size())}};
+        if (best > 0) chips.push_back({L"BEST CHAMPIONSHIP", ordinal(best)});
         int x0 = U(70), cy0 = U(56), ch = U(56), cup = U(28);
         int coffee_w = U(24) + cup + U(12) + measure(ITEM, U(21), COFFEE_LABEL) + U(28);
         int x1 = x0 + coffee_w;

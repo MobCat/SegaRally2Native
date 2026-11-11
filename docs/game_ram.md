@@ -51,8 +51,8 @@ Base 0x22CF14 (`lis 0x23; addi -0x30EC`). Offsets are from the base.
 | 0x22CF14 | +0x00 | int | Mode: **0 championship, 2 practice** (-1 before the mode is chosen). Confirmed |
 | 0x22CF18 | +0x04 | int | Difficulty (0 NORMAL, 1 HARD, 2 VERYHARD, 3 VERYEASY, 4 EASY) |
 | 0x22CF1C | +0x08 | 3 bytes | Player's name (3 letters, '.' padded), copied at race set-up from 0x4C271C (fn_00046AAC). "..." when no name was given |
-| 0x22CF28 | +0x14 | int | Car index (0x224324's choice) |
-| 0x22CF2C | +0x18 | int | Transmission (0 AT, 1 MT) |
+| 0x22CF28 | +0x14 | int | The car in another numbering (NOT the model index: SELECT CAR 0, 1, 2, 3 gave 7, 4, 5, 2 here). Use 0x224324, the SELECT CAR choice, which stays set through the races: the model index (0 Peugeot 306, 1 Toyota Corolla, 2 Ford Escort, 3 Subaru Impreza, 4 Mitsubishi Lancer, 5 Lancia Stratos, 6 Toyota Celica and 7 Lancia Delta hidden) |
+| 0x22CF2C | +0x18 | int | Transmission (0 AT, 1 MT); 0x224334, the select's choice, is the same and is what stats.cpp reads |
 | 0x22CF48 | +0x34 | int | **Round** = course of the race being run, table 0xF244C: course id + 6 × kind. Kinds: championship (C_) 0-5, practice (P_) 6-11, attract (A_) 12-17, 18 = the championship ending scene. Course ids: 0 DESERT_OLD, 1 FOREST, **2 MOUNTAIN, 3 DESERT, 4 MONACO (Riviera), 5 SWEDISH (Snowy)**. Confirmed championship order: 3 Desert, 2 Mountain, 5 Snowy, 4 Riviera; practice Desert 9, Mountain 8, Riviera 10 |
 | 0x22CF4C | +0x38 | int | Stages in this game: 4 championship, 1 practice |
 | 0x22CF50 | +0x3C | int | Laps of this race: 1 in championship stages except Riviera (2); practice 3 (Desert, Mountain), 5 (Riviera) |
@@ -112,8 +112,8 @@ with the next event points:
   stage time added to the totals at +0x168/+0x16C).
 
 Checkpoint extension, confirmed: championship Desert checkpoint 1 added 1800
-frames (+30 s) to the time left at once (1017 → 2787 between two dumps 30
-frames apart); practice Desert
+frames (+30 s) to the time left, counted in one second a frame (the time left
+goes up by 59 a frame until the extension is in); practice Desert
 +10 s per checkpoint, and crossing the lap line adds time as well. The simplest
 detection is the time left (0x22CF88) going **up** while the clock counts
 (0x22CF84 == 2); the checkpoint counter 0x22CFAC + 1 is the same event
@@ -127,8 +127,9 @@ Confirmed sequence for each championship stage (forced runs, every 30 frames):
 1. Goal frame: 0x22CF90 0→1, 0x22D630 1→2, clock state 3, car status 3,
    laps completed = laps. Screen: FINISH!!
 2. About 7 s later: CLEARED <COURSE> STAGE! RANK nn / CLEAR TIME / TOTAL TIME.
-   Stages cleared (0x22CFA4) + 1; fn_0002B6A4 compares it with the stage
-   count (0x22CF4C).
+   Stages cleared (0x22CFA4) + 1 as the card ends, when the next stage's round
+   is already in 0x22CF48 (so the course cleared is the round seen at the
+   goal); the stage-clear code compares it with the stage count (0x22CF4C).
 3. Next stage: round (0x22CF48) changes (3 → 2 → 5 → 4), goal 0x22CF90 and
    0x22D630 go back to 0, clock state 1, then 2 when it starts.
 4. After the last stage (Riviera, 2 laps): CONGRATULATIONS!! card with RANK

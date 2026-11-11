@@ -33,10 +33,12 @@ Lost World port (Model 3 Step 1.5); this file lists what changed for Step 2.1.
 - Hardware bases loaded with `lis`: `0xFE040000` (x164), `0xF10F0000` (x756,
   tilegen), `0xC2000000` (x97), `0xFE100000`, `0xFE140000`, `0x88000000`,
   `0x90000000`, `0x94000000`, `0x98000000` (Real3D).
-- The game hooks (the sight and lever widened for widescreen, scores and phase
-  results for the achievements) are listed with their addresses at the top of
-  `tools/recomp.py`; the runtime side is in `src/runtime/runtime.cpp` and
-  `stats.cpp`. The vblank wait loops are not hooked yet (`IDLE_LOOPS`).
+- The game hooks are listed with their addresses at the top of
+  `tools/recomp.py`; the runtime side is in `src/runtime/runtime.cpp`. The
+  achievements and statistics hook nothing: `src/runtime/stats.cpp` reads the
+  game's race state from RAM at every vblank (the addresses and how they were
+  found are in `docs/game_ram.md`). The vblank wait loops are not hooked yet
+  (`IDLE_LOOPS`).
 
 ## Pipeline
 
