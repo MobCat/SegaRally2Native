@@ -31,14 +31,32 @@ constexpr const wchar_t* COFFEE_LABEL = L"BUY ME A COFFEE";
 constexpr uint32_t COFFEE_INK = 0x0D0C22;   // their dark blue-black
 constexpr const wchar_t* COFFEE_HINT = L"Support the port: opens buymeacoffee.com in your browser";
 
-// MORE RECOMPS: snicolast's other ports
-constexpr const wchar_t* LW_URL = L"https://github.com/snicolast/LostWorldNative";
 // UPDATE AVAILABLE: news.txt on the public repository's main branch (news.h)
 constexpr const wchar_t* NEWS_HOST = L"raw.githubusercontent.com";
 constexpr const wchar_t* NEWS_PATH = L"/snicolast/SegaRally2Native/main/news.txt";
 constexpr const wchar_t* GAME_URL = L"https://github.com/snicolast/SegaRally2Native";
 
-constexpr const wchar_t* LW_ABOUT = L"The Lost World: Jurassic Park, the 1997 SEGA arcade game, remastered for PC like this one. ";
+// MORE RECOMPS: snicolast's other ports, in the order of the menu
+struct Recomp {
+    const wchar_t *title, *url, *about, *tagline;
+    const wchar_t* exe;          // its executable, in its folder
+    const wchar_t* folders[4];   // folders next to this port's where it is looked for
+    const wchar_t *backdrop, *logo;   // res/menu/more/
+    const char* name;            // in the console
+};
+constexpr Recomp RECOMPS[] = {
+    {L"THE LOST WORLD", L"https://github.com/snicolast/LostWorldNative",
+     L"The Lost World: Jurassic Park, the 1997 SEGA arcade game, remastered for PC like this one. ",
+     L"SEGA  \u00B7  1997  \u00B7  ARCADE LIGHT-GUN SHOOTER", L"LostWorld.exe",
+     {L"LostWorldNative", L"LostWorldNative-dev", L"LostWorld", L"The Lost World"},
+     L"more/lost_world_background.jpg", L"more/lost_world_logo.png", "The Lost World"},
+    {L"STAR WARS TRILOGY", L"https://github.com/snicolast/StarWarsTrilogyNative",
+     L"Star Wars Trilogy Arcade, the 1998 SEGA arcade game, remastered for PC like this one. ",
+     L"SEGA  \u00B7  1998  \u00B7  ARCADE RAIL SHOOTER", L"StarWarsTrilogy.exe",
+     {L"StarWarsTrilogyNative", L"StarWarsTrilogyNative-dev", L"StarWarsTrilogy", L"Star Wars Trilogy"},
+     L"more/star_wars_background.jpg", L"more/star_wars_logo.png", "Star Wars Trilogy"},
+};
+static_assert(sizeof(RECOMPS) / sizeof(RECOMPS[0]) == Frontend::RECOMP_COUNT);
 
 double now_seconds() {
     static LARGE_INTEGER freq = [] { LARGE_INTEGER f; QueryPerformanceFrequency(&f); return f; }();
@@ -166,12 +184,15 @@ void FrontendSettings::load(const char* path) {
     if (!f) return;
     char line[512];
     while (fgets(line, sizeof(line), f)) {
-        if (strncmp(line, "lost_world_path", 15) == 0) {   // a path: may have spaces
+        std::string* path_key = strncmp(line, "lost_world_path", 15) == 0 ? &lost_world_path
+                              : strncmp(line, "star_wars_path", 14) == 0  ? &star_wars_path
+                                                                          : nullptr;
+        if (path_key) {   // a path: may have spaces
             const char* v = strchr(line, '=');
             std::string folder = v ? v + 1 : "";
             while (!folder.empty() && strchr(" \t\r\n\"", folder.front())) folder.erase(0, 1);
             while (!folder.empty() && strchr(" \t\r\n\"", folder.back())) folder.pop_back();
-            lost_world_path = folder;
+            *path_key = folder;
             continue;
         }
         char key[64], value[64];
@@ -229,6 +250,7 @@ std::string FrontendSettings::text() const {
     snprintf(buf, sizeof(buf), "check_updates = %d\nnews_seen = %d\nrt_reflections = %d\nglobal_illumination = %s\ndust = %s\n", check_updates, news_seen, reflections, gi == 2 ? "high" : gi ? "low" : "off", dust ? "enhanced" : "original");
     out += buf;
     if (!lost_world_path.empty()) out += "lost_world_path = " + lost_world_path + "\n";
+    if (!star_wars_path.empty()) out += "star_wars_path = " + star_wars_path + "\n";
     return out;
 }
 
@@ -279,8 +301,10 @@ bool Frontend::init(const std::string& font_dir) {
     load(L"logo.png", logo_);
     load(L"snicolast.png", credit_);
     if (!load(L"background.png", backdrop_) && !load(L"background.jpg", backdrop_)) placeholder_backdrop();
-    load(L"more/lost_world_background.jpg", lw_backdrop_);
-    load(L"more/lost_world_logo.png", lw_logo_);
+    for (int g = 0; g < RECOMP_COUNT; g++) {
+        load(RECOMPS[g].backdrop, recomps_[g].backdrop);
+        load(RECOMPS[g].logo, recomps_[g].logo);
+    }
     return ok;
 }
 
@@ -410,14 +434,20 @@ std::vector<Frontend::Item> Frontend::items() const {
                 {DEBUG_GO, L"START RACE", L"", L"The game goes through its selects by itself, unseen, and the race starts"},
                 {BACK, L"BACK", L"", L"Return to the main menu"}};
     }
-    case Screen::More:
-        return {{LOST_WORLD, L"THE LOST WORLD", lw_exe_.empty() ? L"FREE DOWNLOAD" : L"INSTALLED",
-                 std::wstring(LW_ABOUT) + (lw_exe_.empty()
-                     ? (pad_prompts ? L"Not found on this PC: A opens its page, where you can download it"
-                                    : L"Not found on this PC: ENTER opens its page, where you can download it")
-                     : (pad_prompts ? L"Found on this PC: A closes this game and starts it"
-                                    : L"Found on this PC: ENTER closes this game and starts it"))},
-                {BACK, L"BACK", L"", L"Return to the main menu"}};
+    case Screen::More: {
+        std::vector<Item> list;
+        for (int g = 0; g < RECOMP_COUNT; g++) {
+            bool found = !recomps_[g].exe.empty();
+            list.push_back({Id(LOST_WORLD + g), RECOMPS[g].title, found ? L"INSTALLED" : L"FREE DOWNLOAD",
+                            std::wstring(RECOMPS[g].about) + (!found
+                                ? (pad_prompts ? L"Not found on this PC: A opens its page, where you can download it"
+                                               : L"Not found on this PC: ENTER opens its page, where you can download it")
+                                : (pad_prompts ? L"Found on this PC: A closes this game and starts it"
+                                               : L"Found on this PC: ENTER closes this game and starts it"))});
+        }
+        list.push_back({BACK, L"BACK", L"", L"Return to the main menu"});
+        return list;
+    }
     case Screen::Pause:
         return {{RESUME, L"RESUME", L"", L"Back to the game"},
                 {SETTINGS, L"SETTINGS", L"", L"Display, sound and controls"},
@@ -577,7 +607,7 @@ void Frontend::activate(const Item& it, int dir) {
     case RECORDS: tab_ = 0; record_scroll_ = 0; open(Screen::Records); break;
     case QUIT: push(Action::Quit); break;
     case QUIT_TO_MENU: push(Action::QuitToMenu); break;
-    case MORE_GAMES: find_lost_world(); open(Screen::More); break;
+    case MORE_GAMES: find_recomps(); more_game_ = 0; open(Screen::More); break;
     case DEBUG: open(Screen::Debug); break;
     case DEBUG_COURSE: debug_course_ = (debug_course_ + dir + DEBUG_COURSE_COUNT) % DEBUG_COURSE_COUNT; break;
     case DEBUG_CAR: debug_car_ = (debug_car_ + dir + DEBUG_CAR_COUNT) % DEBUG_CAR_COUNT; break;
@@ -587,10 +617,12 @@ void Frontend::activate(const Item& it, int dir) {
         debug_choice = DEBUG_COURSES[debug_course_].index | DEBUG_CARS[debug_car_].index << 4 | debug_gears_ << 8;
         push(Action::StartDebug);
         break;
-    case LOST_WORLD:
-        if (lw_exe_.empty()) open_lost_world_page();
-        else play_lost_world();
+    case LOST_WORLD: case STAR_WARS: {
+        int g = it.id - LOST_WORLD;
+        if (recomps_[g].exe.empty()) open_recomp_page(g);
+        else play_recomp(g);
         break;
+    }
     case BACK: back(); break;
     case RESUME: push(Action::Resume); break;
     case SETTINGS: options_from_pause_ = true; tab_ = 0; open(Screen::Options); break;
@@ -714,7 +746,7 @@ bool Frontend::key(int vk) {
         case VK_TAB: set_tab(tab_ + ((GetKeyState(VK_SHIFT) & 0x8000) ? -1 : 1)); return true;
         }
     if (screen_ == Screen::More && vk == 'G') {   // its page, also when it is installed
-        open_lost_world_page();
+        open_recomp_page(more_game_);
         return true;
     }
     if (coffee_focus_) switch (vk) {   // the donation link at the top: Enter opens it, Up / Down go back to the list
@@ -753,52 +785,56 @@ void Frontend::open_coffee() {   // in the default browser
     ShellExecuteW(nullptr, L"open", COFFEE_URL, nullptr, nullptr, SW_SHOWNORMAL);
 }
 
-// LostWorld.exe: where the settings say, else in a folder next to this
+// Each one's exe: where the settings say, else in a folder next to this
 // port's (from the working folder, then from the exe's)
-void Frontend::find_lost_world() {
-    lw_exe_.clear();
-    std::vector<std::wstring> tries;
-    if (!settings.lost_world_path.empty()) {
-        const std::string& p = settings.lost_world_path;
-        int n = MultiByteToWideChar(CP_UTF8, 0, p.c_str(), -1, nullptr, 0);
-        std::wstring wp(n > 0 ? n - 1 : 0, L'\0');
-        if (n > 1) MultiByteToWideChar(CP_UTF8, 0, p.c_str(), -1, wp.data(), n);
-        bool exe = wp.size() > 4 && _wcsicmp(wp.c_str() + wp.size() - 4, L".exe") == 0;
-        tries.push_back(exe ? wp : wp + L"\\LostWorld.exe");
-    }
+void Frontend::find_recomps() {
     wchar_t module[MAX_PATH] = {};
     GetModuleFileNameW(nullptr, module, MAX_PATH);
     std::wstring exe_dir = module;
     exe_dir = exe_dir.substr(0, exe_dir.find_last_of(L"\\/") + 1);
-    for (const std::wstring& base : {std::wstring(), exe_dir})
-        for (const wchar_t* folder : {L"LostWorldNative", L"LostWorldNative-dev", L"LostWorld", L"The Lost World"})
-            tries.push_back(base + L"..\\" + folder + L"\\LostWorld.exe");
-    for (const std::wstring& t : tries) {
-        wchar_t full[MAX_PATH];
-        if (!GetFullPathNameW(t.c_str(), MAX_PATH, full, nullptr)) continue;
-        DWORD a = GetFileAttributesW(full);
-        if (a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY)) {
-            lw_exe_ = full;
-            printf("[menu] The Lost World: %ls\n", full);
-            return;
+    for (int g = 0; g < RECOMP_COUNT; g++) {
+        const Recomp& r = RECOMPS[g];
+        recomps_[g].exe.clear();
+        std::vector<std::wstring> tries;
+        const std::string& p = g == 0 ? settings.lost_world_path : settings.star_wars_path;
+        if (!p.empty()) {
+            int n = MultiByteToWideChar(CP_UTF8, 0, p.c_str(), -1, nullptr, 0);
+            std::wstring wp(n > 0 ? n - 1 : 0, L'\0');
+            if (n > 1) MultiByteToWideChar(CP_UTF8, 0, p.c_str(), -1, wp.data(), n);
+            bool exe = wp.size() > 4 && _wcsicmp(wp.c_str() + wp.size() - 4, L".exe") == 0;
+            tries.push_back(exe ? wp : wp + L"\\" + r.exe);
+        }
+        for (const std::wstring& base : {std::wstring(), exe_dir})
+            for (const wchar_t* folder : r.folders)
+                tries.push_back(base + L"..\\" + folder + L"\\" + r.exe);
+        for (const std::wstring& t : tries) {
+            wchar_t full[MAX_PATH];
+            if (!GetFullPathNameW(t.c_str(), MAX_PATH, full, nullptr)) continue;
+            DWORD a = GetFileAttributesW(full);
+            if (a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY)) {
+                recomps_[g].exe = full;
+                printf("[menu] %s: %ls\n", r.name, full);
+                break;
+            }
         }
     }
 }
 
-void Frontend::open_lost_world_page() {   // in the default browser
-    ShellExecuteW(nullptr, L"open", LW_URL, nullptr, nullptr, SW_SHOWNORMAL);
+void Frontend::open_recomp_page(int g) {   // in the default browser
+    ShellExecuteW(nullptr, L"open", RECOMPS[g].url, nullptr, nullptr, SW_SHOWNORMAL);
 }
 
 // Started from its own folder (it finds its ROM, res/ and save/ there); this
 // game closes so the two do not fight over the GPU and the sound
-void Frontend::play_lost_world() {
-    std::wstring dir = lw_exe_.substr(0, lw_exe_.find_last_of(L"\\/"));
-    if (INT_PTR(ShellExecuteW(nullptr, L"open", lw_exe_.c_str(), nullptr, dir.c_str(), SW_SHOWNORMAL)) > 32) {
+void Frontend::play_recomp(int g) {
+    std::wstring& exe = recomps_[g].exe;
+    std::wstring dir = exe.substr(0, exe.find_last_of(L"\\/"));
+    if (INT_PTR(ShellExecuteW(nullptr, L"open", exe.c_str(), nullptr, dir.c_str(), SW_SHOWNORMAL)) > 32) {
         push(Action::Quit);
         return;
     }
-    printf("[menu] could not start %ls\n", lw_exe_.c_str());
-    lw_exe_.clear();   // shown as not installed: ENTER opens the page
+    printf("[menu] could not start %ls\n", exe.c_str());
+    exe.clear();   // shown as not installed: ENTER opens the page
     dirty_ = true;
 }
 
@@ -1581,15 +1617,17 @@ void Frontend::backdrop_background() {
     fill(0, 0, w_, h_, 0x000000, 0.3f);
     px_ = bg_.data();
     shade_backdrop();
-    // MORE RECOMPS: The Lost World's art in place of the picture, its logo on the left
-    bg_more_.clear();
-    if (lw_backdrop_.w > 0) {
-        bg_more_.assign(size_t(w_) * h_, 0xFF000000u);
-        px_ = bg_more_.data();
-        picture(lw_backdrop_, 0, 0, w_, h_, 0.25f);
+    // MORE RECOMPS: each game's art in place of the picture, its logo on the left
+    for (int g = 0; g < RECOMP_COUNT; g++) {
+        RecompArt& a = recomps_[g];
+        a.bg.clear();
+        if (a.backdrop.w <= 0) continue;
+        a.bg.assign(size_t(w_) * h_, 0xFF000000u);
+        px_ = a.bg.data();
+        picture(a.backdrop, 0, 0, w_, h_, 0.25f);
         shade_backdrop();
-        RECT r = lw_logo_rect();
-        if (lw_logo_.w > 0 && r.right > r.left) sprite(lw_logo_, r.left, r.top, r.right - r.left, r.bottom - r.top);
+        RECT r = recomp_logo_rect(g);
+        if (a.logo.w > 0 && r.right > r.left) sprite(a.logo, r.left, r.top, r.right - r.left, r.bottom - r.top);
     }
     px_ = keep;
 }
@@ -1657,13 +1695,14 @@ void Frontend::shade_backdrop() {
 
 // Centred in the room left of the menu's column, at most 560 (1080p) wide;
 // empty when the window is too narrow for it
-RECT Frontend::lw_logo_rect() const {
-    if (lw_logo_.w <= 0) return RECT{};
+RECT Frontend::recomp_logo_rect(int g) const {
+    const Picture& logo = recomps_[g].logo;
+    if (logo.w <= 0) return RECT{};
     auto U = [&](float v) { return int(v * u_ + 0.5f); };
     int room = w_ - U(110) - U(720) - U(40);
     int lw = std::min(U(560), room - U(120));
     if (lw < U(220)) return RECT{};
-    int lh = lw * lw_logo_.h / lw_logo_.w;
+    int lh = lw * logo.h / logo.w;
     int x = (room - lw) / 2, y = int(0.28f * h_);
     return RECT{x, y, x + lw, y + lh};
 }
@@ -1721,10 +1760,10 @@ void Frontend::draw_side_menu(const std::vector<Item>& list) {
         }
     }
 
-    if (screen_ == Screen::More && !bg_more_.empty()) {   // under its logo (on the backdrop)
-        RECT r = lw_logo_rect();
+    if (screen_ == Screen::More && !recomps_[more_game_].bg.empty()) {   // under its logo (on the backdrop)
+        RECT r = recomp_logo_rect(more_game_);
         if (r.right > r.left)
-            text(MONO, U(22), L"SEGA  \u00B7  1997  \u00B7  ARCADE LIGHT-GUN SHOOTER", (r.left + r.right) / 2, r.bottom + U(26), 1,
+            text(MONO, U(22), RECOMPS[more_game_].tagline, (r.left + r.right) / 2, r.bottom + U(26), 1,
                  {0xE8D8B0, 0xC8B080, EDGE, U(2)});
     }
 
@@ -1790,8 +1829,8 @@ void Frontend::draw_side_menu(const std::vector<Item>& list) {
     // The keys at the right, each in a keycap (or the gamepad's button), ending at the right edge
     struct Key { const wchar_t *pad, *key, *what; };
     std::vector<Key> keys = {{L"A", L"ENTER", L"SELECT"}};
-    if (screen_ == Screen::More && selected_ < n && list[selected_].id == LOST_WORLD) {
-        if (lw_exe_.empty()) keys = {{L"A", L"ENTER", L"OPEN PAGE"}};
+    if (screen_ == Screen::More && selected_ < n && selected_ < RECOMP_COUNT) {
+        if (recomps_[selected_].exe.empty()) keys = {{L"A", L"ENTER", L"OPEN PAGE"}};
         else keys = {{L"A", L"ENTER", L"PLAY"}, {L"Y", L"G", L"GITHUB PAGE"}};
     }
     if (screen_ != Screen::Main) keys.push_back({L"B", L"ESC", L"BACK"});
@@ -1940,7 +1979,7 @@ bool Frontend::draw(int w, int h, std::vector<uint32_t>& out) {
         u_ = std::min(h / 1080.0f, w / 1440.0f);
         bg_.clear();
         bg_blur_.clear();
-        bg_more_.clear();
+        for (RecompArt& a : recomps_) a.bg.clear();
     }
     if (screen_ == Screen::Splash) {
         if (draw_splash(out)) {
@@ -1956,7 +1995,8 @@ bool Frontend::draw(int w, int h, std::vector<uint32_t>& out) {
     if (over_game) out.assign(size_t(w) * h, 0);
     else {
         if (bg_.empty()) backdrop_background();
-        out = page ? bg_blur_ : screen_ == Screen::More && !bg_more_.empty() ? bg_more_ : bg_;
+        if (screen_ == Screen::More && selected_ < RECOMP_COUNT && !coffee_focus_) more_game_ = selected_;   // on BACK: the last one stays
+        out = page ? bg_blur_ : screen_ == Screen::More && !recomps_[more_game_].bg.empty() ? recomps_[more_game_].bg : bg_;
     }
     px_ = out.data();
     hit_.clear();

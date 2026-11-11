@@ -51,6 +51,7 @@ struct FrontendSettings {
     bool splash = true;     // the logo video at launch (splash_screens = 0: straight to the menu)
     bool menu_music = true; // the game's Main Title in the menus
     std::string lost_world_path;   // MORE RECOMPS: where The Lost World is (its folder or LostWorld.exe; "" = look for it)
+    std::string star_wars_path;    // MORE RECOMPS: where Star Wars Trilogy is (its folder or StarWarsTrilogy.exe; "" = look for it)
     bool check_updates = true;     // at launch, news.txt on GitHub: a window with what is new and UPDATE NOW
     int news_seen = 0;             // the newest news.txt entry the player closed with LATER
 
@@ -67,6 +68,7 @@ struct FrontendSettings {
 
 class Frontend {
 public:
+    static constexpr int RECOMP_COUNT = 2;   // the games of MORE RECOMPS
     enum class Screen { None, Splash, Main, Options, Pause, Records, More, Debug };
     enum class Action { None, StartArcade, Resume, Quit, ToggleFullscreen, SettingsChanged,
                         QuitToMenu, StartDebug };
@@ -125,7 +127,7 @@ public:
 private:
     enum Id {
         PLAY, OPTIONS, QUIT, BACK, RESUME, SETTINGS, QUIT_TO_MENU, TABS,
-        RECORDS, MORE_GAMES, LOST_WORLD,
+        RECORDS, MORE_GAMES, LOST_WORLD, STAR_WARS,   // LOST_WORLD + g: the games of MORE RECOMPS, in order
         DEBUG, DEBUG_COURSE, DEBUG_CAR, DEBUG_GEARS, DEBUG_TIME, DEBUG_GO,
         OPT_QUALITY, OPT_DISPLAY, OPT_VOLUME, OPT_MUSIC, OPT_SPEAKERS, OPT_REAR, OPT_SAMPLES, OPT_AA, OPT_HAZE, OPT_BLOOM, OPT_AO, OPT_SUN, OPT_SHADOWS, OPT_SOFT, OPT_HDR, OPT_SHARPEN, OPT_TEXT,
         OPT_SAT, OPT_GAMMA, OPT_MOTION, OPT_VIBRATION, OPT_RT, OPT_MENU_MUSIC, OPT_REFLECT, OPT_GI, OPT_DUST, OPT_UPDATES,
@@ -193,16 +195,20 @@ private:
     void backdrop_background();
     // Main, Play, Boss, Survival and Debug on the backdrop: a column at the right under the logo
     void draw_side_menu(const std::vector<Item>& list);
-    // MORE RECOMPS: snicolast's other ports (for now The Lost World). Its art
-    // (res/menu/more/) on the left of the backdrop; ENTER plays it when it is
-    // on this PC, else opens its page
-    Picture lw_backdrop_, lw_logo_;
-    std::vector<uint32_t> bg_more_;   // the backdrop of MORE RECOMPS for the current size
-    std::wstring lw_exe_;             // LostWorld.exe found on this PC ("" = not found)
-    void find_lost_world();
-    void open_lost_world_page();
-    void play_lost_world();
-    RECT lw_logo_rect() const;        // where its logo goes on the backdrop
+    // MORE RECOMPS: snicolast's other ports (The Lost World, Star Wars Trilogy).
+    // The chosen one's art (res/menu/more/) on the left of the backdrop; ENTER
+    // plays it when it is on this PC, else opens its page
+    struct RecompArt {
+        Picture backdrop, logo;
+        std::vector<uint32_t> bg;   // its backdrop of MORE RECOMPS for the current size
+        std::wstring exe;           // found on this PC ("" = not found)
+    };
+    RecompArt recomps_[RECOMP_COUNT];
+    int more_game_ = 0;               // the one whose art is shown (the chosen one, the last one on BACK)
+    void find_recomps();
+    void open_recomp_page(int g);
+    void play_recomp(int g);
+    RECT recomp_logo_rect(int g) const;   // where its logo goes on the backdrop
     void placeholder_backdrop();      // no background picture: a drawn one (Sega Rally 2)
     void shade_backdrop();            // darker at the right and the bottom, the logo: on px_
     // UPDATE AVAILABLE: the window over the main menu with the entries of
