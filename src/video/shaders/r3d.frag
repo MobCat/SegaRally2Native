@@ -573,7 +573,7 @@ void main() {
         // the sides away from the sun (the other cars, in the world, miss the
         // bounce of the ambient occlusion pass too): beside the arcade, and beside the same
         // car with ray tracing, its white paint came out a dull grey. A fixed
-        // fill in the colour of the sunlit dirt road, stronger on the faces
+        // fill (0.2 of the sun; 0.1 with the bounce) in the colour of the sunlit dirt road, stronger on the faces
         // turned to the ground, stands in for the light the ground throws back
         // (and the other cars, ACTOR with specular paint, as in the replays
         // and the attract: not the people, who are self-lit cards)

@@ -1202,7 +1202,9 @@ void R3DRenderer::update_atmosphere(const ScreenLayout& lay, uint32_t target_w, 
     }
     // Fill light on the player's car where the traced bounce is not there
     // (r3d.frag; SR2_CAR_FILL=without,with to compare, 0 = none)
-    static float car_fill[2] = {0.3f, 0.15f};
+    // (0.3 matched the arcade's Lancer at the start, but on the Corolla's
+    // side in the shade its whites came out brighter than the arcade's)
+    static float car_fill[2] = {0.2f, 0.1f};
     static const bool fill_read = [] {
         if (const char* e = getenv("SR2_CAR_FILL")) sscanf(e, "%f,%f", &car_fill[0], &car_fill[1]);
         return true;
