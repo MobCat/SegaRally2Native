@@ -128,6 +128,7 @@ private:
     enum Id {
         PLAY, OPTIONS, QUIT, BACK, RESUME, SETTINGS, QUIT_TO_MENU, TABS,
         RECORDS, MORE_GAMES, LOST_WORLD, STAR_WARS,   // LOST_WORLD + g: the games of MORE RECOMPS, in order
+        COFFEE,   // MORE RECOMPS: the donation link
         DEBUG, DEBUG_COURSE, DEBUG_CAR, DEBUG_GEARS, DEBUG_TIME, DEBUG_GO,
         OPT_QUALITY, OPT_DISPLAY, OPT_VOLUME, OPT_MUSIC, OPT_SPEAKERS, OPT_REAR, OPT_SAMPLES, OPT_AA, OPT_HAZE, OPT_BLOOM, OPT_AO, OPT_SUN, OPT_SHADOWS, OPT_SOFT, OPT_HDR, OPT_SHARPEN, OPT_TEXT,
         OPT_SAT, OPT_GAMMA, OPT_MOTION, OPT_VIBRATION, OPT_RT, OPT_MENU_MUSIC, OPT_REFLECT, OPT_GI, OPT_DUST, OPT_UPDATES,
@@ -233,9 +234,7 @@ private:
     void news_choose(int button);
     void start_update();
 
-    RECT coffee_rect_{};   // the donation link (main menu)
-    bool coffee_hot_ = false, coffee_focus_ = false;
-    void open_coffee();
+    void open_coffee();   // the donation link (MORE RECOMPS)
 
     // The splash screens: their pictures, which one is on and since when
     std::vector<Picture> splash_;
