@@ -47,7 +47,8 @@ versions will not work. `build.bat` says which chips are missing.
 ## Install
 
 You need Windows 10/11 (64-bit) and a GPU with a Vulkan 1.3 driver (most from 2016 on). Ray
-tracing needs an NVIDIA RTX or an AMD RX 6000 or newer; DLAA and DLSS, an NVIDIA RTX.
+tracing needs an NVIDIA RTX or an AMD RX 6000 or newer; DLAA and DLSS, an NVIDIA RTX. On other
+cards those options switch themselves off, and the game builds the same on any GPU.
 
 1. Download this repository (green **Code** button > **Download ZIP**) and unzip it.
 2. Put `srally2.zip` in the folder.
@@ -72,7 +73,8 @@ tick *MSVC v143 - VS 2022 C++ x64/x86 build tools (Latest)*, *C++ CMake tools fo
 and one *Windows 11 SDK* (it works on Windows 10 too).
 
 Then run `build.bat` with `srally2.zip` next to it (or pass its path: `build.bat D:\roms\srally2.zip`).
-It downloads SDL3, miniz and NVIDIA DLSS on the first run.
+It downloads SDL3, miniz and NVIDIA DLSS on the first run. DLSS is optional: if that download
+fails, the game is built without it and uses MSAA.
 </details>
 
 If the build can't download SDL3 or miniz (a proxy, an antivirus, a flaky connection), it lists
