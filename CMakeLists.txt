@@ -213,8 +213,13 @@ add_executable(SegaRally2 WIN32
     ${MUSASHI_DIR}/m68kdasm.c
     ${MUSASHI_GEN}/m68kops.c
     ${GEN_SOURCES}
-    res/app.rc
 )
+# The icon (res/app.rc) is compiled in a target of its own, so rc.exe gets none of
+# the include folders and defines of the game: with all of them (and a long folder
+# path) the rc.exe of older Windows SDKs (10.0.19041) stops with "fatal error
+# RC1107: invalid usage" (issue #9)
+add_library(SegaRally2_res OBJECT res/app.rc)
+target_sources(SegaRally2 PRIVATE $<TARGET_OBJECTS:SegaRally2_res>)
 add_dependencies(SegaRally2 shaders)
 target_include_directories(SegaRally2 PRIVATE
     ${SHADER_OUT}
