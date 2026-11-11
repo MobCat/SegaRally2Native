@@ -131,16 +131,16 @@ void R3DSceneBuilder::build(const R3DFrameState& state, R3DScene& out) {
         }
     // The game's shadows under the cars: black, self-lit, see-through
     // untextured polygons in the world (several shapes laid over each other,
-    // which stacked into steps of darker grey); hidden when the cars cast
-    // sun shadows of their own, traced or in the shadow map
-    // (set_hide_blob_shadows); with the shadows off they are the cars' only
-    // shadow (SR2_BLOB_SHADOW=F keeps F of their opacity, to compare)
-    static const float blob_keep = getenv("SR2_BLOB_SHADOW") ? float(atof(getenv("SR2_BLOB_SHADOW"))) : 0.0f;
-    if (hide_blob_shadows_ && blob_keep < 1.0f)
+    // blended only once at each pixel: R3DRenderer blob_). Hidden when the
+    // cars cast traced sun shadows of their own (set_hide_blob_shadows);
+    // without ray tracing they are the cars' shadow, as in the arcade.
+    // SR2_BLOB_SHADOW=F: F of their opacity where they show (to compare)
+    static const float blob_keep = getenv("SR2_BLOB_SHADOW") ? float(atof(getenv("SR2_BLOB_SHADOW"))) : 0.7f;
+    if (hide_blob_shadows_ || blob_keep != 1.0f)
         for (R3DVertex& x : out.vertices)
             if ((x.flags & (R3D_WORLD | R3D_LUMINOUS | R3D_TEXTURED)) == (R3D_WORLD | R3D_LUMINOUS) &&
                 (x.color & 0x00FFFFFFu) == 0 && (x.color >> 24) < 255)
-                x.color = uint32_t(std::clamp(float(x.color >> 24) * blob_keep, 0.0f, 255.0f) + 0.5f) << 24;
+                x.color = uint32_t(std::clamp(float(x.color >> 24) * (hide_blob_shadows_ ? 0.0f : blob_keep), 0.0f, 255.0f) + 0.5f) << 24;
     // Sega Rally 2 draws the player's car in a full-screen viewport of its
     // own beside the world's (not the world: no fog, no haze), lit by the sun;
     // the HUD's 3D gauges are in small ones and the others hold a polygon or two

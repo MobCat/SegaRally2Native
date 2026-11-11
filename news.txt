@@ -14,7 +14,7 @@
 # Newest entry at the top. Keep each one short: about ten lines fit.
 
 [4] 11 November 2026
-- Shadows: the cars cast a sun shadow again without ray tracing, so they no longer seem to float.
+- Shadows: without ray tracing the cars have the arcade's shadow underneath again, so they no longer seem to float.
 - Without ray tracing, the sun's shadows have smooth edges instead of blocky steps.
 
 [3] 11 November 2026

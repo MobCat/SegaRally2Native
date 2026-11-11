@@ -478,9 +478,13 @@ void main() {
 
     vec4 c = t * col;
     if (c.a < 1.0 / 32.0) discard;
-    // Depth of the nearest see-through surface (spec 7.2); effects stay out of it
+    // Depth of the nearest see-through surface (spec 7.2); effects stay out of
+    // it. Not the game's black patch under each car (its shadow: untextured,
+    // self-lit): it is made of several shapes laid over each other, which
+    // blended one over another came out nearly black; only the nearest shows
     if (vp.quality.x <= -1000.0) {
-        if ((flags & (TEX_ALPHA | ALPHA_TEST | LUMINOUS)) != 0u) discard;
+        bool blob = (flags & (WORLD | LUMINOUS | TEXTURED)) == (WORLD | LUMINOUS) && max(col.r, max(col.g, col.b)) == 0.0;
+        if ((flags & (TEX_ALPHA | ALPHA_TEST | LUMINOUS)) != 0u && !blob) discard;
         return;
     }
     // Texture alpha (spec 7.2): solid texels belong to the opaque pass, the
