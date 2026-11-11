@@ -47,9 +47,10 @@ rem 3. MSVC, CMake and a Windows SDK (the same check as build.bat)
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 set "VS_ADD=--add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --add Microsoft.VisualStudio.Component.VC.CMake.Project --add Microsoft.VisualStudio.Component.Windows11SDK.22621"
 call tools\find_vs.bat && goto vs_ok
-rem Visual Studio is there without the C++ tools: add them to it
+rem Visual Studio 2022 or later is there without the C++ tools: add them to it (an
+rem older one is left alone and Build Tools 2022 is installed next to it)
 set "VSDIR="
-if exist "%VSWHERE%" for /f "usebackq delims=" %%i in (`"%VSWHERE%" -all -latest -products * -property installationPath`) do set "VSDIR=%%i"
+if exist "%VSWHERE%" for /f "usebackq delims=" %%i in (`"%VSWHERE%" -all -latest -version 17.0 -products * -property installationPath`) do set "VSDIR=%%i"
 if "%VSDIR%"=="" goto vs_new
 echo Adding the C++ tools to "%VSDIR%". Accept the Windows prompt; it takes a while.
 "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\setup.exe" modify --installPath "%VSDIR%" %VS_ADD% --passive --norestart
