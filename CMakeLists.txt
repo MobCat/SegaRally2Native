@@ -32,6 +32,12 @@ set(GLSLANG_TESTS OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(ENABLE_SPVREMAPPER OFF CACHE BOOL "" FORCE)
 set(SKIP_GLSLANG_INSTALL ON CACHE BOOL "" FORCE)
+# glslang's precompiled header (cmake_pch.hxx) is written in UTF-8 with the
+# full path of pch.h: without /utf-8, cl read it in the ANSI code page and a
+# folder with accents (C:\Users\José\...) came out mangled (C1083)
+if(MSVC)
+    add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:/utf-8>)
+endif()
 add_subdirectory(third_party/glslang EXCLUDE_FROM_ALL)
 
 set(SHADER_DIR ${CMAKE_SOURCE_DIR}/src/video/shaders)
