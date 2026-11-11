@@ -7,10 +7,12 @@ rem call it.
 rem vswhere first, with -all: without it, vswhere leaves out an instance that waits for
 rem a Windows restart (common right after installing Build Tools). Then the default
 rem folders, for a vswhere that is missing or does not list it.
+rem Only 2022 (version 17) or later: with Visual Studio 2019 the build stopped at the
+rem icon (issue #9), so install.bat installs Build Tools 2022 next to it instead.
 set "VSDIR="
 set "WINSDK="
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
-if exist "%VSWHERE%" for /f "usebackq delims=" %%i in (`"%VSWHERE%" -all -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.VC.CMake.Project -property installationPath`) do call :check "%%i"
+if exist "%VSWHERE%" for /f "usebackq delims=" %%i in (`"%VSWHERE%" -all -latest -version 17.0 -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.VC.CMake.Project -property installationPath`) do call :check "%%i"
 if not defined VSDIR for /d %%v in ("%ProgramFiles%\Microsoft Visual Studio\*" "%ProgramFiles(x86)%\Microsoft Visual Studio\*") do for /d %%e in ("%%v\*") do call :check "%%e"
 if not defined VSDIR exit /b 1
 rem The Windows SDK is a separate component in the Visual Studio Installer: the MSVC
@@ -25,6 +27,9 @@ if defined WINSDK exit /b 0
 exit /b 2
 
 :check
+set "VSCAND=%~1"
+if not "%VSCAND:\2017\=%"=="%VSCAND%" exit /b 0
+if not "%VSCAND:\2019\=%"=="%VSCAND%" exit /b 0
 if exist "%~1\VC\Auxiliary\Build\vcvars64.bat" if exist "%~1\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" set "VSDIR=%~1"
 exit /b 0
 
