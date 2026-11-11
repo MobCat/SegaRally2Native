@@ -9,7 +9,6 @@
 
 <p align="center">
   <a href="https://www.youtube.com/@snicolast"><img src="https://img.shields.io/badge/YouTube-@snicolast-red?logo=youtube&logoColor=white" alt="YouTube: snicolast"></a>
-  <a href="https://buymeacoffee.com/snicolast8u"><img src="https://img.shields.io/badge/Buy_me_a_coffee-snicolast8u-FFDD00?logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
 <p align="center">
@@ -121,12 +120,7 @@ sharp, about 30% lighter on the GPU than DLAA: the one to try first at 1440p, 4K
 - Other recompiled arcade games: [The Lost World](https://github.com/snicolast/LostWorldNative)
   and [Star Wars Trilogy](https://github.com/snicolast/StarWarsTrilogyNative).
 
-## Support
-
-If you enjoy the port and want to help with the time and tools behind it, you can buy me a coffee.
-Entirely optional: it supports the work on this project, not the game, which belongs to Sega.
-
-<a href="https://buymeacoffee.com/snicolast8u"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="50"></a>
+<!-- asking for money for this feels gross to me. we just plug code into ai and let it do most of it. Users shoudeln't have to pay for our drug habit -->
 
 ## License
 
