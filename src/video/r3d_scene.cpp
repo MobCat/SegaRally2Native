@@ -132,12 +132,16 @@ void R3DSceneBuilder::build(const R3DFrameState& state, R3DScene& out) {
     // The game's shadows under the cars: black, self-lit, see-through
     // untextured polygons in the world (several shapes laid over each other,
     // which stacked into steps of darker grey); hidden when the cars cast
-    // traced shadows (set_hide_blob_shadows)
-    if (hide_blob_shadows_)
+    // traced shadows (set_hide_blob_shadows). Not all the way: the traced sun
+    // shadow falls away from the car with the sun high or behind it, and is
+    // faint, so the car seemed to float. A lighter blob stays as its contact
+    // shadow (SR2_BLOB_SHADOW=F: F of its opacity, 0 hides it as before)
+    static const float blob_keep = getenv("SR2_BLOB_SHADOW") ? float(atof(getenv("SR2_BLOB_SHADOW"))) : 0.5f;
+    if (hide_blob_shadows_ && blob_keep < 1.0f)
         for (R3DVertex& x : out.vertices)
             if ((x.flags & (R3D_WORLD | R3D_LUMINOUS | R3D_TEXTURED)) == (R3D_WORLD | R3D_LUMINOUS) &&
                 (x.color & 0x00FFFFFFu) == 0 && (x.color >> 24) < 255)
-                x.color = 0;
+                x.color = uint32_t(std::clamp(float(x.color >> 24) * blob_keep, 0.0f, 255.0f) + 0.5f) << 24;
     // Sega Rally 2 draws the player's car in a full-screen viewport of its
     // own beside the world's (not the world: no fog, no haze), lit by the sun;
     // the HUD's 3D gauges are in small ones and the others hold a polygon or two
