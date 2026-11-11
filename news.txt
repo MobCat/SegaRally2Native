@@ -15,5 +15,5 @@
 
 [1] 11 November 2026
 - 14 achievements, from your first finish to champion of the championship.
-- RECORDS in the main menu: your achievements and statistics (races, championships, best laps and times on each course).
+- RECORDS is back in the main menu, with ACHIEVEMENTS and STATS tabs: races, championships, best laps and times on each course.
 - MORE RECOMPS now lists Star Wars Trilogy too.
