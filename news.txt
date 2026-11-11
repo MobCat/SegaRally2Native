@@ -13,6 +13,10 @@
 #   # ...          a comment, never shown
 # Newest entry at the top. Keep each one short: about ten lines fit.
 
+[4] 11 November 2026
+- Shadows: the cars keep a soft shadow underneath with ray tracing on, so they no longer seem to float.
+- Without ray tracing, the sun's shadows have smooth edges instead of blocky steps.
+
 [3] 11 November 2026
 - No more console window behind the game.
 - Building: fixed a Visual Studio setup error on PCs with an unusual PATH, and the NVIDIA DLSS download is now optional.
